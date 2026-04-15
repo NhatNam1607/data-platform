@@ -1,0 +1,92 @@
+version: "3.8"
+name: data-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dagster-db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data  # Đổi tên volume cho rõ ràng
+    environment:
+      POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    networks:
+      - dagster-network
+    restart: unless-stopped
+    healthcheck:  # Thêm healthcheck để đảm bảo service sẵn sàng
+      test: ["CMD-SHELL", "pg_isready -U ${DAGSTER_POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  dagster-code:
+    build: ./src/workflows
+    container_name: dagster-code
+    environment:
+      DAGSTER_POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
+      DAGSTER_POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
+      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
+      DAGSTER_CURRENT_IMAGE: ${DAGSTER_CURRENT_IMAGE}
+    ports:
+      - "4000:4000"
+    networks:
+      - dagster-network
+    volumes:
+      - dagster-code-logs:/var/log/dagster
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dagster-webserver:
+    image: jayefee/dagster-webserver:latest
+    container_name: dagster-webserver
+    environment:
+      DAGSTER_POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
+      DAGSTER_POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
+      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
+      DAGSTER_CURRENT_IMAGE: ${DAGSTER_CURRENT_IMAGE}
+    ports:
+      - "3080:3000"
+    networks:
+      - dagster-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs/dagster-webserver:/var/log/dagster
+    command: dagster-webserver -h 0.0.0.0 -p 3000 -w workspace.yaml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dagster-code:
+        condition: service_started
+
+  dagster-daemon:
+    image: jayefee/dagster-daemon:latest
+    container_name: dagster-daemon
+    environment:
+      DAGSTER_POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
+      DAGSTER_POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
+      DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
+      DAGSTER_CURRENT_IMAGE: ${DAGSTER_CURRENT_IMAGE}
+    networks:
+      - dagster-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./logs/dagster-daemon:/var/log/dagster
+    command: dagster-daemon run
+    depends_on:
+      postgres:
+        condition: service_healthy
+      dagster-webserver:
+        condition: service_started
+
+networks:
+  dagster-network:
+    name: dagster-network
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
