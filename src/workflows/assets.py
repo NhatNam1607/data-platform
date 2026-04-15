@@ -8,7 +8,7 @@ def long_running_asset():
     for i in range(12):
         logger.info(f"Running batch {i+1}/12...")
         # simulate some work
-        time.sleep(30)
+        time.sleep(3)
     logger.info("✅ long_running_asset completed.")
 
 
