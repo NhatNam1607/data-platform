@@ -6,7 +6,7 @@ services:
     image: postgres:16-alpine
     container_name: dagster-db
     volumes:
-      - postgres-data:/var/lib/postgresql/data  # Đổi tên volume cho rõ ràng
+      - postgres-data:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
       POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
@@ -16,7 +16,7 @@ services:
     networks:
       - dagster-network
     restart: unless-stopped
-    healthcheck:  # Thêm healthcheck để đảm bảo service sẵn sàng
+    healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DAGSTER_POSTGRES_USER}"]
       interval: 10s
       timeout: 5s
@@ -54,7 +54,7 @@ services:
       - dagster-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./logs/dagster-webserver:/var/log/dagster
+      - dagster-webserver-logs:/var/log/dagster
     command: dagster-webserver -h 0.0.0.0 -p 3000 -w workspace.yaml
     depends_on:
       postgres:
@@ -74,7 +74,7 @@ services:
       - dagster-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./logs/dagster-daemon:/var/log/dagster
+      - dagster-daemon-logs:/var/log/dagster
     command: dagster-daemon run
     depends_on:
       postgres:
@@ -89,4 +89,10 @@ networks:
 
 volumes:
   postgres-data:
+    driver: local
+  dagster-code-logs:
+    driver: local
+  dagster-webserver-logs:
+    driver: local
+  dagster-daemon-logs:
     driver: local
