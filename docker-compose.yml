@@ -14,7 +14,7 @@ services:
 
   dagster_code:
     build:
-      context: ./src/workflows
+      context: ./src
       dockerfile: Dockerfile
     image: dagster-code:latest
     container_name: dagster_code
