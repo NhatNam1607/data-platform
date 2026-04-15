@@ -1,12 +1,7 @@
-version: "3.8"
-name: data-platform
-
 services:
   postgres:
-    image: postgres:16-alpine
-    container_name: dagster-db
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
+    image: postgres:latest
+    container_name: dagster-poc-postgres
     environment:
       POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
       POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
@@ -14,85 +9,68 @@ services:
     ports:
       - "5432:5432"
     networks:
-      - dagster-network
+      - dagster-poc-network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DAGSTER_POSTGRES_USER}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  dagster-code:
-    build: ./src/workflows
-    container_name: dagster-code
+  dagster_code:
+    build:
+      context: ./src/workflows
+      dockerfile: Dockerfile
+    image: dagster-code:latest
+    container_name: dagster_code
     environment:
       DAGSTER_POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
       DAGSTER_POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
       DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
-      DAGSTER_CURRENT_IMAGE: ${DAGSTER_CURRENT_IMAGE}
     ports:
       - "4000:4000"
     networks:
-      - dagster-network
-    volumes:
-      - dagster-code-logs:/var/log/dagster
+      - dagster-poc-network
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
 
-  dagster-webserver:
-    image: jayefee/dagster-webserver:latest
-    container_name: dagster-webserver
+  dagster_webserver:
+    image: jayefee/dagster_webserver:latest
+    container_name: dagster_webserver
     environment:
       DAGSTER_POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
       DAGSTER_POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
       DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
-      DAGSTER_CURRENT_IMAGE: ${DAGSTER_CURRENT_IMAGE}
+      DAGSTER_CURRENT_IMAGE: dagster-code:latest
+      DAGSTER_HOME: /opt/dagster/dagster_home
     ports:
       - "3080:3000"
     networks:
-      - dagster-network
+      - dagster-poc-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dagster-webserver-logs:/var/log/dagster
-    command: dagster-webserver -h 0.0.0.0 -p 3000 -w workspace.yaml
+      - ./platform/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml
+      - ./platform/workspace.yaml:/opt/dagster/dagster_home/workspace.yaml
+    command: dagster-webserver -h 0.0.0.0 -p 3000 -w /opt/dagster/dagster_home/workspace.yaml
     depends_on:
-      postgres:
-        condition: service_healthy
-      dagster-code:
-        condition: service_started
+      - postgres
+      - dagster_code
 
-  dagster-daemon:
-    image: jayefee/dagster-daemon:latest
-    container_name: dagster-daemon
+  dagster_daemon:
+    image: jayefee/dagster_daemon:latest
+    container_name: dagster_daemon
     environment:
       DAGSTER_POSTGRES_USER: ${DAGSTER_POSTGRES_USER}
       DAGSTER_POSTGRES_PASSWORD: ${DAGSTER_POSTGRES_PASSWORD}
       DAGSTER_POSTGRES_DB: ${DAGSTER_POSTGRES_DB}
-      DAGSTER_CURRENT_IMAGE: ${DAGSTER_CURRENT_IMAGE}
+      DAGSTER_CURRENT_IMAGE: dagster-code:latest
+      DAGSTER_HOME: /opt/dagster/dagster_home
     networks:
-      - dagster-network
+      - dagster-poc-network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - dagster-daemon-logs:/var/log/dagster
+      - ./platform/dagster.yaml:/opt/dagster/dagster_home/dagster.yaml
+      - ./platform/workspace.yaml:/opt/dagster/dagster_home/workspace.yaml
     command: dagster-daemon run
     depends_on:
-      postgres:
-        condition: service_healthy
-      dagster-webserver:
-        condition: service_started
+      - dagster_webserver
 
 networks:
-  dagster-network:
-    name: dagster-network
+  dagster-poc-network:
+    name: dagster-poc-network
     driver: bridge
-
-volumes:
-  postgres-data:
-    driver: local
-  dagster-code-logs:
-    driver: local
-  dagster-webserver-logs:
-    driver: local
-  dagster-daemon-logs:
-    driver: local

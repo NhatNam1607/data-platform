@@ -9,7 +9,7 @@ run_coordinator:
 storage:
   postgres:
     postgres_db:
-      hostname: dagster-db
+      hostname: dagster-poc-postgres
       username:
         env: DAGSTER_POSTGRES_USER
       password:
@@ -22,7 +22,8 @@ run_launcher:
   module: dagster_docker
   class: DockerRunLauncher
   config:
-    network: dagster-network
+    image: dagster-code:latest
+    network: dagster-poc-network
     env_vars:
       - DAGSTER_POSTGRES_USER
       - DAGSTER_POSTGRES_PASSWORD
