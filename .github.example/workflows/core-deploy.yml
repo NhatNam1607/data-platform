@@ -3,7 +3,7 @@ name: Deploy Dagster Core (Webserver & Daemon)
 on:
   push:
     paths:
-      - 'dagster-oss/**'
+      - 'deploy/**'
       - '.github/workflows/core-deploy.yml'
     branches:
       - main
@@ -29,8 +29,8 @@ jobs:
       - name: 🛠️ Build and push dagster_webserver
         uses: docker/build-push-action@v5
         with:
-          context: ./dagster-oss
-          file: ./dagster-oss/Dockerfile
+          context: ./deploy
+          file: ./deploy/Dockerfile
           push: true
           tags: ${{ env.WEBSERVER_IMAGE }}
           platforms: linux/amd64
@@ -40,8 +40,8 @@ jobs:
       - name: 🛠️ Build and push dagster_daemon
         uses: docker/build-push-action@v5
         with:
-          context: ./dagster-oss
-          file: ./dagster-oss/Dockerfile
+          context: ./deploy
+          file: ./deploy/Dockerfile
           push: true
           tags: ${{ env.DAEMON_IMAGE }}
           platforms: linux/amd64
