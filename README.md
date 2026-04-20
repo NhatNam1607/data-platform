@@ -1,6 +1,6 @@
-# Data Platform - Dagster + dbt
+# Data Platform - Dagster + dbt + dlt
 
-Modern data orchestration with Dagster and dbt transformations.
+Modern data orchestration with Dagster, dbt transformations, and dlt ingestion.
 
 ---
 
@@ -8,6 +8,7 @@ Modern data orchestration with Dagster and dbt transformations.
 
 ```
 data-platform/
+├── ingestion/             # dlt sources and pipeline builders
 ├── orchestration/         # Dagster code (assets, schedules)
 ├── transformation/        # dbt project (models, tests)
 ├── deploy/               # Production configs (dagster.yaml, workspace.yaml)
@@ -109,6 +110,42 @@ dagster dev → Click "Materialize" on dbt assets
 cd transformation
 export $(cat ../.env | xargs)
 dbt run --profiles-dir .
+```
+
+### Working with dlt
+
+This repo uses native dlt environment-variable config. You do not need to commit a `/.dlt` folder or `secrets.toml` into the repo.
+
+Required env vars:
+
+```bash
+DESTINATION__POSTGRES__CREDENTIALS__DATABASE=jemmia
+DESTINATION__POSTGRES__CREDENTIALS__USERNAME=root
+DESTINATION__POSTGRES__CREDENTIALS__PASSWORD=...
+DESTINATION__POSTGRES__CREDENTIALS__HOST=...
+DESTINATION__POSTGRES__CREDENTIALS__PORT=30943
+DESTINATION__POSTGRES__CREDENTIALS__CONNECT_TIMEOUT=34
+SOURCES__HARAVAN__BASE_URL=https://apis.haravan.com/com/
+SOURCES__HARAVAN__API_TOKEN=...
+```
+
+Validate Dagster definitions:
+
+```bash
+dagster definitions validate
+# or
+dg check defs
+```
+
+Test Haravan materialization locally:
+
+```bash
+dagster dev
+# In Dagster UI, materialize the `ingestion/haravan/orders` asset.
+# Optional run config fields:
+# - start_date
+# - end_date
+# - full_refresh
 ```
 
 ### Docker Operations
