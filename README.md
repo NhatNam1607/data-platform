@@ -15,628 +15,125 @@ data-platform/
 ├── Dockerfile            # Dagster code server image
 ├── docker-compose.yml    # Full stack (postgres, dagster services)
 ├── .env                  # Environment variables (not in git)
-└── requirements.txt      # Python dependencies (for Docker)
+└── pyproject.toml        # Python dependencies
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
 ### Prerequisites
-
 - Python 3.10+
 - Docker & Docker Compose
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
 
 ### Setup
-
 ```bash
-# Clone and navigate
+# 1. Clone the repository
 git clone <repo-url>
 cd data-platform
 
-# Setup environment (choose one)
-# Option A: uv (recommended)
+# 2. Setup virtual environment
 uv venv && source .venv/bin/activate && uv sync
+# OR with pip: python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 
-# Option B: pip
-python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-
-# Configure environment
+# 3. Configure environment
 cp .env.example .env
-# Edit .env with your database credentials
+# Edit .env with your credentials
 ```
 
 ---
 
-## 💻 Development
+## 💻 Development Modes
 
-### Local Development (Fast)
+### Option 1: Local Development (Fastest)
+Best for developing new assets, testing dbt models, and quick iterations.
 
 ```bash
-dagster dev  # or: dg dev
+dagster dev
 # UI: http://127.0.0.1:3000
 ```
+- **Features**: Hot-reload, automatic `.env` loading, fast startup (~5s).
+- **Storage**: Uses local SQLite for metadata (temporary).
 
-**Features:** Auto-reload, automatic .env loading, fast startup
-
-### Docker (Production-like)
+### Option 2: Docker Compose (Production-like)
+Best for testing production deployment, networking, and persistent storage.
 
 ```bash
 docker-compose up --build -d
 # UI: http://127.0.0.1:3080
 ```
-
-**Features:** Full stack, PostgreSQL storage, container isolation
-
----
-
-## 📦 Package Management
-
-### Add Dependencies
-
-```bash
-# Add package (uv)
-uv add package-name
-
-# Export for Docker
-uv export --no-hashes -o requirements.txt
-
-# Commit both pyproject.toml and requirements.txt
-git add pyproject.toml uv.lock requirements.txt
-```
-
-### Sync Dependencies (After git pull)
-
-```bash
-# If using uv
-uv sync
-
-# If using pip
-pip install -r requirements.txt
-```
+- **Features**: Full stack isolation, PostgreSQL persistent storage.
+- **Database**: Host: `localhost`, Port: `5432`.
 
 ---
 
-## 🔧 Common Tasks
-
-### Working with dbt
-
-```bash
-# Via Dagster UI (recommended)
-dagster dev → Click "Materialize" on dbt assets
-
-# Direct dbt commands (if needed)
-cd transformation
-export $(cat ../.env | xargs)
-dbt run --profiles-dir .
-```
+## 🛠️ Key Workflows
 
 ### 📥 Adding New Ingestion (dlt)
-
 1. **Define Resources**: Create `ingestion/<connector>/resources/` to define endpoints.
-   - Use `primary_key` for deduplication/deduping.
-   - Use `write_disposition="merge"` for Upsert (Merge) logic.
+   - Use `primary_key` for deduplication.
+   - Use `write_disposition="merge"` for Upsert logic.
    - Use `incremental` to fetch only new/updated records.
-2. **Setup Source**: In `ingestion/<connector>/source.py`, define the `dlt.source` and its parameters.
-3. **Register Dagster Assets**: In `orchestration/assets/ingestion/<connector>.py`, use the `@dlt_assets` decorator with `IngestionDagsterDltTranslator`.
-4. **Environment Variables**: Add credentials to `.env` using dlt naming convention (e.g., `SOURCES__HARAVAN__API_TOKEN`).
+2. **Setup Source**: In `ingestion/<connector>/source.py`, define the `dlt.source`.
+3. **Register Assets**: In `orchestration/assets/ingestion/<connector>.py`, use `@dlt_assets`.
+4. **Env Vars**: Add `SOURCES__<CONNECTOR>__API_TOKEN` to `.env`.
+
+### 🔄 Working with dbt
+1. **Develop**: Edit models in `transformation/models/`.
+2. **Run via UI**: Click "Materialize" on dbt assets in Dagster.
+3. **Run via CLI**:
+   ```bash
+   cd transformation
+   export $(cat ../.env | xargs)
+   dbt run --profiles-dir .
+   ```
+
+---
+
+## 📦 Tooling & Maintenance
+
+### Package Management (uv)
+This project uses **uv** for speed and reliability.
+```bash
+# Add package
+uv add package-name
+
+# Export for Docker (required after adding packages)
+uv export --no-hashes -o requirements.txt
+
+# Update all
+uv sync --upgrade
+```
 
 ### Docker Operations
-
 ```bash
-# Rebuild after code changes
-docker-compose up --build -d
+# Build and restart code server
+docker-compose up --build -d dagster_code
 
 # View logs
 docker-compose logs -f dagster_code
 
-# Restart service
-docker-compose restart dagster_code
-
-# Clean up
+# Clean up volumes
 docker-compose down -v
 ```
+
+---
+
+## 🚢 Production Deployment
+
+1. **Build image**: `docker build -t your-registry/dagster-code:latest .`
+2. **Push image**: `docker push your-registry/dagster-code:latest`
+3. **Deploy**: Update `image` in `docker-compose.yml` and run `docker-compose pull && docker-compose up -d`.
 
 ---
 
 ## 🐛 Troubleshooting
 
-**"Env var required but not provided"**
-- Ensure `.env` exists with all required variables
-- For `dagster dev`: automatic
-- For `dbt` CLI: `export $(cat .env | xargs)` first
-
-**"manifest.json not found"**
-- Auto-generated by `dagster dev`
-- For Docker: built into image
-
-**Connection errors**
-- Check `.env` credentials
-- Test: `cd transformation && dbt debug --profiles-dir .`
-
----
-
-## 🚢 Production Deployment
-
-```bash
-# Build and push image
-docker build -t your-registry/dagster-code:latest .
-docker push your-registry/dagster-code:latest
-
-# Deploy
-docker-compose pull && docker-compose up -d
-```
-
----
-
-## 📚 Resources
-
-- [Dagster Docs](https://docs.dagster.io/)
-- [dbt Docs](https://docs.getdbt.com/)
-- [uv Docs](https://docs.astral.sh/uv/)
+- **"Env var not provided"**: Ensure `.env` exists. For dbt CLI, run `export $(cat ../.env | xargs)`.
+- **"manifest.json not found"**: Auto-generated on startup. For Docker, it's built into the image.
+- **Connection errors**: Check `DBT_POSTGRES_HOST` and credentials in `.env`.
 
 ---
 
 **Happy Data Engineering! 🚀**
-- Dagster automatically loads `.env` file
-- dbt manifest is auto-generated on startup
-- Hot reload on code changes
-- UI available at: http://127.0.0.1:3000
-
-**Features:**
-- ✅ Auto-reload on code changes
-- ✅ Automatic `.env` loading
-- ✅ Fast startup (~5 seconds)
-- ✅ SQLite storage (temporary)
-- ✅ Perfect for development
-
-**When to use:**
-- Developing new assets
-- Testing dbt models
-- Debugging transformations
-- Quick iterations
-
----
-
-### Option 2: Docker Compose (Production-like)
-
-**Full production-like environment:**
-
-```bash
-# Build and start all services
-docker-compose up --build -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-**Access:**
-- Dagster UI: http://127.0.0.1:3080
-- PostgreSQL: localhost:5432
-
-**Features:**
-- ✅ Production-like setup
-- ✅ PostgreSQL persistent storage
-- ✅ Container isolation
-- ✅ Scalable architecture
-- ✅ Multi-service orchestration
-
-**When to use:**
-- Testing production deployment
-- Integration testing
-- Performance testing
-- Before deploying to production
-
----
-
-## 🔧 Development Workflow
-
-### Working with dbt Models
-
-**1. Develop models in `transformation/models/`**
-
-```sql
--- transformation/models/staging/stg_customers.sql
-SELECT
-    id,
-    name,
-    email
-FROM {{ source('raw', 'customers') }}
-```
-
-**2. Test locally with Dagster:**
-
-```bash
-# Start Dagster
-dagster dev
-
-# Go to UI: http://127.0.0.1:3000
-# Click "Materialize" on your dbt assets
-```
-
-**3. Run dbt commands directly (if needed):**
-
-```bash
-cd transformation
-
-# Load environment variables first
-export $(cat ../.env | xargs)
-
-# Run dbt commands
-dbt run --profiles-dir .
-dbt test --profiles-dir .
-```
-
----
-
-### Adding New Assets
-
-**1. Create Python asset:**
-
-```python
-# orchestration/assets.py
-from dagster import asset
-
-@asset(group_name="my_group")
-def my_new_asset():
-    # Your logic here
-    return "result"
-```
-
-**2. Reload Dagster:**
-
-- `dagster dev` auto-reloads
-- Docker: `docker-compose restart dagster_code`
-
----
-
-## 🐳 Docker Deployment
-
-### Build and Deploy
-
-```bash
-# Build image
-docker-compose build dagster_code
-
-# Start all services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f dagster_webserver
-docker-compose logs -f dagster_code
-
-# Restart specific service
-docker-compose restart dagster_code
-```
-
-### Update After Code Changes
-
-```bash
-# Rebuild and restart
-docker-compose up --build -d dagster_code
-
-# Or rebuild all
-docker-compose up --build -d
-```
-
----
-
-## � Monitoring and Debugging
-
-### Check Service Health
-
-```bash
-# Check all services
-docker-compose ps
-
-# Check logs
-docker-compose logs -f dagster_webserver
-docker-compose logs -f dagster_daemon
-docker-compose logs -f dagster_code
-
-# Check specific container
-docker logs dagster_code
-```
-
-### Common Issues
-
-**Issue: "Env var required but not provided"**
-
-```bash
-# Solution: Ensure .env file exists and is loaded
-# For dagster dev: Automatic
-# For docker-compose: Check docker-compose.yml environment section
-# For dbt CLI: Export variables manually
-```
-
-**Issue: "manifest.json not found"**
-
-```bash
-# Solution: dbt manifest will be auto-generated
-# For dagster dev: Automatic via prepare_if_dev()
-# For docker: Built into image during docker build
-```
-
-**Issue: "Connection refused to database"**
-
-```bash
-# Solution: Check database credentials in .env
-# Test connection:
-cd transformation
-export $(cat ../.env | xargs)
-dbt debug --profiles-dir .
-```
-
----
-
-## 🔄 Run Launchers
-
-The platform supports two run launcher modes (configured in `deploy/dagster.yaml`):
-
-### DefaultRunLauncher (Current)
-- Tasks run in-process within `dagster_code` container
-- Faster execution (no container startup overhead)
-- Shared resources
-- **Best for:** Development, simple deployments
-
-### DockerRunLauncher (Alternative)
-- Each task runs in isolated container
-- Better isolation and resource limits
-- Slower startup (~1-3 seconds per task)
-- **Best for:** Production with strict isolation needs
-
-**To switch:** Uncomment DockerRunLauncher section in `deploy/dagster.yaml`
-
----
-
-## 📝 Environment Variables Reference
-
-### Dagster Metadata Storage
-```bash
-DAGSTER_POSTGRES_USER=postgres
-DAGSTER_POSTGRES_PASSWORD=your_password
-DAGSTER_POSTGRES_DB=dagster
-```
-
-### dbt Database Connection
-```bash
-DBT_POSTGRES_HOST=your_db_host
-DBT_POSTGRES_PORT=5432
-DBT_POSTGRES_USER=your_user
-DBT_POSTGRES_PASSWORD=your_password
-DBT_POSTGRES_DBNAME=your_database
-DBT_POSTGRES_SCHEMA=staging
-```
-
----
-
-## 🧪 Testing
-
-### Test dbt Models
-
-```bash
-# Via Dagster UI
-dagster dev
-# Click "Materialize" on transformation_dbt_assets
-
-# Via dbt CLI
-cd transformation
-export $(cat ../.env | xargs)
-dbt test --profiles-dir .
-```
-
-### Test Python Assets
-
-```bash
-# Via Dagster UI
-dagster dev
-# Click "Materialize" on specific asset
-
-# Via CLI
-dagster asset materialize --select my_asset
-```
-
----
-
-## 🚢 Production Deployment
-
-### Prerequisites
-- Docker registry access
-- Production database credentials
-- Server with Docker installed
-
-### Deployment Steps
-
-1. **Build production image:**
-```bash
-docker build -t your-registry/dagster-code:latest .
-docker push your-registry/dagster-code:latest
-```
-
-2. **Update docker-compose.yml:**
-```yaml
-dagster_code:
-  image: your-registry/dagster-code:latest
-```
-
-3. **Deploy on server:**
-```bash
-# On production server
-docker-compose pull
-docker-compose up -d
-```
-
-4. **Verify deployment:**
-```bash
-docker-compose ps
-docker-compose logs -f
-```
-
----
-
-## 🛠️ Maintenance
-
-### Package Management
-
-This project uses **uv** for local development and **pip** for Docker builds.
-
-#### Adding New Dependencies
-
-**Using uv (Local Development):**
-
-```bash
-# Add a new package
-uv add package-name
-
-# Add a development dependency
-uv add --dev package-name
-
-# Add a specific version
-uv add package-name==1.2.3
-
-# Sync dependencies (install all packages from pyproject.toml)
-uv sync
-```
-
-**After adding packages with uv, export to requirements.txt for Docker:**
-
-```bash
-# Export dependencies to requirements.txt
-uv pip compile pyproject.toml -o requirements.txt
-
-# Or use uv export
-uv export --no-hashes -o requirements.txt
-```
-
-#### Syncing Dependencies (When Team Members Add Packages)
-
-**If someone added packages via uv:**
-
-```bash
-# Pull latest code
-git pull
-
-# Sync dependencies from pyproject.toml and uv.lock
-uv sync
-```
-
-**If someone updated requirements.txt:**
-
-```bash
-# Pull latest code
-git pull
-
-# Install from requirements.txt
-pip install -r requirements.txt
-
-# Or with uv
-uv pip install -r requirements.txt
-```
-
-#### Converting Between uv and requirements.txt
-
-**From uv to requirements.txt (for Docker):**
-
-```bash
-# Generate requirements.txt from pyproject.toml
-uv export --no-hashes -o requirements.txt
-
-# Or compile with specific Python version
-uv pip compile pyproject.toml -o requirements.txt --python-version 3.10
-```
-
-**From requirements.txt to uv:**
-
-```bash
-# If you have requirements.txt and want to use uv
-# First, create pyproject.toml if it doesn't exist
-uv init
-
-# Then add packages from requirements.txt
-cat requirements.txt | xargs -I {} uv add {}
-
-# Or manually add packages
-uv add dagster dagster-dbt dbt-core dbt-postgres
-```
-
-#### Update Dependencies
-
-**Using uv:**
-
-```bash
-# Update all packages
-uv sync --upgrade
-
-# Update specific package
-uv add package-name --upgrade
-
-# Update and export to requirements.txt
-uv sync --upgrade
-uv export --no-hashes -o requirements.txt
-```
-
-**Using pip:**
-
-```bash
-# Update Python packages
-pip install --upgrade -r requirements.txt
-pip freeze > requirements.txt
-```
-
-#### Update dbt Packages
-
-```bash
-# Update dbt packages
-cd transformation
-dbt deps --upgrade
-```
-
-### Backup Database
-
-```bash
-# Backup Dagster metadata
-docker exec dagster-poc-postgres pg_dump -U postgres dagster > backup.sql
-
-# Restore
-docker exec -i dagster-poc-postgres psql -U postgres dagster < backup.sql
-```
-
-### Clean Up
-
-```bash
-# Remove all containers and volumes
-docker-compose down -v
-
-# Remove dangling images
-docker image prune -f
-
-# Remove all stopped containers
-docker container prune -f
-```
-
----
-
-## 📚 Additional Resources
-
-- [Dagster Documentation](https://docs.dagster.io/)
-- [dbt Documentation](https://docs.getdbt.com/)
-- [Dagster + dbt Integration](https://docs.dagster.io/integrations/dbt)
-
----
-
-## 🤝 Contributing
-
-1. Create feature branch
-2. Make changes
-3. Test locally with `dagster dev`
-4. Test with Docker: `docker-compose up --build`
-5. Submit pull request
-
----
