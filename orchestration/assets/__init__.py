@@ -1,11 +1,10 @@
 """
 Assets module - All Dagster assets organized by layer
 """
-from dagster import load_assets_from_modules
 
-from . import transformation
+from .ingestion import all_assets as ingestion_assets
+from .transformation import all_assets as transformation_assets
 
-# Load all assets from submodules
-all_assets = load_assets_from_modules([transformation])
+all_assets = transformation_assets + ingestion_assets
 
 __all__ = ["all_assets"]

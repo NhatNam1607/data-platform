@@ -112,41 +112,15 @@ export $(cat ../.env | xargs)
 dbt run --profiles-dir .
 ```
 
-### Working with dlt
+### 📥 Adding New Ingestion (dlt)
 
-This repo uses native dlt environment-variable config. You do not need to commit a `/.dlt` folder or `secrets.toml` into the repo.
-
-Required env vars:
-
-```bash
-DESTINATION__POSTGRES__CREDENTIALS__DATABASE=jemmia
-DESTINATION__POSTGRES__CREDENTIALS__USERNAME=root
-DESTINATION__POSTGRES__CREDENTIALS__PASSWORD=...
-DESTINATION__POSTGRES__CREDENTIALS__HOST=...
-DESTINATION__POSTGRES__CREDENTIALS__PORT=30943
-DESTINATION__POSTGRES__CREDENTIALS__CONNECT_TIMEOUT=34
-SOURCES__HARAVAN__BASE_URL=https://apis.haravan.com/com/
-SOURCES__HARAVAN__API_TOKEN=...
-```
-
-Validate Dagster definitions:
-
-```bash
-dagster definitions validate
-# or
-dg check defs
-```
-
-Test Haravan materialization locally:
-
-```bash
-dagster dev
-# In Dagster UI, materialize the `ingestion/haravan/orders` asset.
-# Optional run config fields:
-# - start_date
-# - end_date
-# - full_refresh
-```
+1. **Define Resources**: Create `ingestion/<connector>/resources/` to define endpoints.
+   - Use `primary_key` for deduplication/deduping.
+   - Use `write_disposition="merge"` for Upsert (Merge) logic.
+   - Use `incremental` to fetch only new/updated records.
+2. **Setup Source**: In `ingestion/<connector>/source.py`, define the `dlt.source` and its parameters.
+3. **Register Dagster Assets**: In `orchestration/assets/ingestion/<connector>.py`, use the `@dlt_assets` decorator with `IngestionDagsterDltTranslator`.
+4. **Environment Variables**: Add credentials to `.env` using dlt naming convention (e.g., `SOURCES__HARAVAN__API_TOKEN`).
 
 ### Docker Operations
 

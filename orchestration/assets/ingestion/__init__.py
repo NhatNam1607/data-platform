@@ -1,8 +1,9 @@
 """
-Ingestion layer - Data ingestion from various sources
+Ingestion layer Dagster asset wrappers.
 """
-# Future: Import dlt, Airbyte, and other ingestion assets here
-# from .dlt import all_dlt_assets
-# from .airbyte import all_airbyte_assets
 
-__all__ = []
+from .haravan import haravan_assets
+
+all_assets = [haravan_assets]
+
+__all__ = ["all_assets", "haravan_assets"]

@@ -1,12 +1,9 @@
-"""
-Transformation layer schedules
-"""
 from dagster import ScheduleDefinition, define_asset_job, AssetSelection
 
 # Job to run all dbt models
 dbt_daily_job = define_asset_job(
     name="dbt_daily_refresh",
-    selection=AssetSelection.groups("transformation_dbt_assets"),
+    selection=AssetSelection.groups("transformation"),
     description="Run all dbt models daily",
 )
 
